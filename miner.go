@@ -49,8 +49,9 @@ for{ //while loop
 	buffer := make([]byte, 1024)
 	_,err = conn.Read(buffer) // Getting the job
 	if err!=nil{
-		log.Println("Error getting the job:")
-		log.Println(err)
+		log.Println("Error getting the job. Reconnecting to server")
+		work(connect(username, password))
+	
 	}
 
 	job := strings.Split(string(buffer), ",") // parsing the job
@@ -128,13 +129,13 @@ func workers(username string, password string){
 	work(conn)
 }
 
+var username string = ""
+var password string = ""
+
 func main() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	
-	username := ""
-	password := ""
-
 	log.Println("Enter Username:")
 	fmt.Scan(&username)
 	log.Println("Enter password:")
