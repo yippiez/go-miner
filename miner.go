@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"net"
 	"encoding/hex"
-	"sync"
 	"fmt"
 	"os"
 	"time"
@@ -72,16 +71,17 @@ func work(conn net.Conn){
 		if !checkErr(err){
 			log.Println("Error getting the job. Reconnecting to server in 15 seconds")
 			time.Sleep(15 * time.Second)
-			work(connect(username, password))
+			work(connect(username, password, getServerInfo()))
 		}
 
 		job := strings.Split(string(buffer), ",") // parsing the job
-		buffer = make([]byte, 1024) // buffer for receiving
+		buffer = make([]byte, 4) // buffer for receiving
 		diff, _ := strconv.Atoi( strings.Replace(job[2],"\x00", "", -1) ) //Removes null bytes from job then converts it to an int
 		
 
 
 		for i := 0; i <= (diff * 100); i++ {
+			hashes++
 			h := sha1.New() //hashing object
 			h.Write( []byte(job[0] + strconv.Itoa(i)) )
 			nh := hex.EncodeToString(h.Sum(nil))
@@ -96,25 +96,29 @@ func work(conn net.Conn){
 					break
 				}
 				
-				if strings.Replace(string(buffer),"\x00", "", -1) == "GOOD"{
-					log.Printf("Accepted share %d Difficulty %d\n",i,diff)
-				}else if strings.Replace(string(buffer),"\x00", "", -1) == "BAD"{
+				if string(buffer) == "GOOD"{
+					accepted++
+					//log.Printf("Accepted share %d Difficulty %d\n",i,diff)
+				}
+				/*
+				else if string(buffer) == "BAD "{
 					log.Printf("Rejected share %d Difficulty %d\n",i,diff)
 				}
+				*/
 			}
 		}
 	}
 }
 
-func connect(username string, password string) net.Conn{
+func connect(username string, password string, addr string) net.Conn{
 
-	addr := getServerInfo()
+	
 	conn, err := net.Dial("tcp", addr)
 	
 	if !checkErr(err){
 		log.Println("Error creating connection trying again in 15 seconds")
 		time.Sleep(15 * time.Second)
-		return connect(username, password)
+		return connect(username, password,addr)
 	}
 
 	// Get the current server version
@@ -125,7 +129,7 @@ func connect(username string, password string) net.Conn{
 	if(!checkErr(err)){
 		log.Println("Servers might be down retry in 15 seconds.")
 		time.Sleep(15 * time.Second)
-		return connect(username, password)	
+		return connect(username, password,addr)	
 	}
 
 	// Login to server
@@ -140,20 +144,20 @@ func connect(username string, password string) net.Conn{
 	if(!checkErr(err)){
 		log.Println("Cannot receive login feedback retry in 15 seconds.")
 		time.Sleep(15 * time.Second)
-		return connect(username, password)	
+		return connect(username, password,addr)	
 	}
 
 	if string(buffer) == "NO,"{
 		log.Println("Wrong username or password.")
-		return connect(username, password)	
+		return connect(username, password,addr)	
 	}
 
 	return conn
 }
 
 
-func workers(username string, password string){
-	conn := connect(username,password)
+func workers(username string, password string, addr string){
+	conn := connect(username,password,addr)
 	defer conn.Close()
 	work(conn)
 }
@@ -162,11 +166,45 @@ var username string = ""
 var password string = ""
 var x int = 0
 
+var hashes int = 0
+var accepted int = 0
+var balance float64 = 0
+var balanceNew float64 = 0
+
+func profit(){
+	balanceNew := getBalance()
+	log.Print("PROFIT: ",balanceNew-balance)
+}
+
+func calcHash(){
+	totalKhashes := hashes / 1000
+	hashes = 0
+	log.Print("TOTAL",totalKhashes,"K/Hs")
+	log.Print("Accepted Shares:",accepted)
+}
+
+func getBalance()(float64){
+	
+	conn := connect(username, password, getServerInfo())
+
+	_,err := conn.Write([]byte("BALA"))
+	
+	if(!checkErr(err)){
+		return -1
+	}
+
+	buffer := make([]byte, 100)
+	conn.Read(buffer)
+	ball, _ := strconv.ParseFloat( strings.Replace(string(buffer),"\x00", "", -1), 32)
+
+	return ball
+}
+
 func main() {
-	var wg sync.WaitGroup
-	wg.Add(1)
 
 	argsWithoutProg := os.Args[1:]
+	addr := getServerInfo()
+	
 
 	if len(argsWithoutProg) == 0 {
 
@@ -185,12 +223,22 @@ func main() {
 	
 	}
 
-
+	balance = getBalance()
 
 	for i:=0;i<x;i++{
-		go workers(username, password)
+		go workers(username, password,addr)
 	}
 	
-	wg.Wait()
+	go func(){
+		for{
+			time.Sleep(60 * time.Second)
+			profit()
+		}
+	}()
+
+	for{
+		time.Sleep(1 * time.Second)
+		calcHash()
+	}
 }
 
