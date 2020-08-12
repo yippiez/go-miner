@@ -1,3 +1,4 @@
+
 package main
 
 import (
@@ -236,6 +237,7 @@ func main() {
 
 	for i:=0;i<x;i++{
 		go workers(username, password,addr)
+		time.Sleep(1*time.Second)
 	}
 	
 	go func(){
@@ -250,4 +252,3 @@ func main() {
 		calcHash()
 	}
 }
-
