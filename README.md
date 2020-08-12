@@ -15,6 +15,9 @@ A **[duino-coin](https://duinocoin.com/)**.miner made in golang.
 
 If you want to learn more about goroutines [here](https://gobyexample.com/goroutines).
 
+**You can use miner from the command line like this:**
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `miner.exe 'username' 'password' 'goroutine count'`
+
 ****
 ### Todo:
 * Add cache so you don't have to enter your credential every time

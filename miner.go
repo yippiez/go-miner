@@ -32,7 +32,7 @@ func getServerInfo()(string){
 	*/
 
 	resp, err := http.Get("https://raw.githubusercontent.com/revoxhere/duino-coin/gh-pages/serverip.txt") // gets the response
-
+	 
 	if !checkErr(err){
 		log.Println("Error getting server info trying again in 15 seconds")
 		time.Sleep(15 * time.Second)
@@ -68,13 +68,22 @@ func work(conn net.Conn){
 		buffer := make([]byte, 1024)
 		_,err = conn.Read(buffer) // Getting the job
 		
+		/*
 		if !checkErr(err){
 			log.Println("Error getting the job. Reconnecting to server in 15 seconds")
 			time.Sleep(15 * time.Second)
 			work(connect(username, password, getServerInfo()))
 		}
+		*/
 
 		job := strings.Split(string(buffer), ",") // parsing the job
+
+		if len(job) != 3{
+			log.Println("Error getting the job. Reconnecting to server in 15 seconds")
+			time.Sleep(15 * time.Second)
+			work(connect(username, password, getServerInfo()))	
+		}
+
 		buffer = make([]byte, 4) // buffer for receiving
 		diff, _ := strconv.Atoi( strings.Replace(job[2],"\x00", "", -1) ) //Removes null bytes from job then converts it to an int
 		
