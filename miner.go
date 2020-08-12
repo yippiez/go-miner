@@ -183,6 +183,7 @@ var balanceNew float64 = 0
 func profit(){
 	balanceNew := getBalance()
 	log.Print("PROFIT: ",balanceNew-balance)
+	balance = balanceNew
 }
 
 func calcHash(){
