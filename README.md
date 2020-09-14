@@ -8,15 +8,13 @@ A **[duino-coin](https://duinocoin.com/)**.miner made in golang.
 ### Arguments:
 * **Username** -> *Your username*
 
-* **Password** -> *Your password*
-
 * **When asked "How many goroutine you want?" answer with a number.**
 *More goroutine will make miner faster but to an extent.*
 
 If you want to learn more about goroutines [here](https://gobyexample.com/goroutines).
 
 **You can use miner from the command line like this:**
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `miner.exe 'username' 'password' 'goroutine count'`
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `miner.exe 'username' 'goroutine count'`
 
 ****
 ### Todo:
