@@ -1,5 +1,13 @@
-
 package main
+
+/*
+.TODO
+
+*- Replace ReadString with ReadUntil
+*- Unite all error reading to one function
+*- Use flag to get arguments from command line
+
+*/
 
 import (
 	"net/http"
@@ -13,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"time"
+	"bufio"
 )
 
 
@@ -20,27 +29,18 @@ func checkErr(x error)(bool){
 	if x == nil{
 		return true
 	}
-
-	log.Println(x)
+	log.Print(x)
+	log.Fatalf("Error quiting.")
 	return false
 }
 
 
 func getServerInfo()(string){
 
-	/*
-		Gets the server info in the format of host:port
-	*/
+	/* Gets the server info in the format of host:port */
 
 	resp, err := http.Get("https://raw.githubusercontent.com/revoxhere/duino-coin/gh-pages/serverip.txt") // gets the response
-	 
-	if !checkErr(err){
-		log.Println("Error getting server info trying again in 15 seconds")
-		time.Sleep(15 * time.Second)
-		return getServerInfo()
-	}
-	
-	log.Println("Got the server info!")
+	checkErr(err)
 	
 	defer resp.Body.Close() // waits for the functions end to execute
 
@@ -63,117 +63,68 @@ func getServerInfo()(string){
 }
 
 func work(conn net.Conn){
+	
+	reader := bufio.NewReader(conn) //reads from tcp connection
+
 	for{ //while loop
-		_,err := conn.Write([]byte("JOB")) // Asking for a job
-
-		buffer := make([]byte, 1024)
-		_,err = conn.Read(buffer) // Getting the job
 		
-		/*
-		if !checkErr(err){
+		_,err := conn.Write([]byte("JOB,"+username)) // Asking for a job
+		
+		hash, err := reader.ReadString(',')
+		hash = strings.TrimSuffix(hash, ",")
+		
+		if err != nil{
 			log.Println("Error getting the job. Reconnecting to server in 15 seconds")
 			time.Sleep(15 * time.Second)
-			work(connect(username, password, getServerInfo()))
+			work(conn)
 		}
-		*/
 
-		job := strings.Split(string(buffer), ",") // parsing the job
+		job, err := reader.ReadString(',')
+		job = strings.TrimSuffix(job, ",")
 
-		if len(job) != 3{
+		if err != nil{
 			log.Println("Error getting the job. Reconnecting to server in 15 seconds")
 			time.Sleep(15 * time.Second)
-			work(connect(username, password, getServerInfo()))	
+			work(conn)
 		}
 
-		buffer = make([]byte, 4) // buffer for receiving
-		diff, _ := strconv.Atoi( strings.Replace(job[2],"\x00", "", -1) ) //Removes null bytes from job then converts it to an int
-		
+		diff := 3500 // fixed causes unnecesary lag
 
 
 		for i := 0; i <= (diff * 100); i++ {
-			hashes++
+			hashes++ // add to hash counter
 			h := sha1.New() //hashing object
-			h.Write( []byte(job[0] + strconv.Itoa(i)) )
-			nh := hex.EncodeToString(h.Sum(nil))
+			h.Write( []byte(hash + strconv.Itoa(i)) )
+			newhash := hex.EncodeToString(h.Sum(nil))
 
-			if (nh) == job[1]{ //if the result is even with the job
+			if (newhash) == job{ //if the result is the same with the job
 
 				_,err = conn.Write( []byte(strconv.Itoa(i)) ) //sends the result of hash algorithm to the pool
-
-				_,err = conn.Read(buffer) //reads response
 				
-				if !checkErr(err){
-					break
-				}
+				s, err := reader.ReadString('D')
+				checkErr(err)		
 				
-				if string(buffer) == "GOOD"{
+				if strings.Contains(s, "GOOD"){
 					accepted++
-					//log.Printf("Accepted share %d Difficulty %d\n",i,diff)
 				}
-				/*
-				else if string(buffer) == "BAD "{
-					log.Printf("Rejected share %d Difficulty %d\n",i,diff)
-				}
-				*/
 			}
 		}
 	}
 }
 
-func connect(username string, password string, addr string) net.Conn{
 
-	
+func workers(username string, addr string){
 	conn, err := net.Dial("tcp", addr)
-	
-	if !checkErr(err){
-		log.Println("Error creating connection trying again in 15 seconds")
-		time.Sleep(15 * time.Second)
-		return connect(username, password,addr)
-	}
+	buff := make([]byte, 3)
+	_,_ = conn.Read(buff)
+	log.Println("Server is on version:" + string(buff))
 
-	// Get the current server version
-	buffer := make([]byte, 3)
-	_,err = conn.Read(buffer)
-	log.Println("Server is on version:" + string(buffer))
-
-	if(!checkErr(err)){
-		log.Println("Servers might be down retry in 15 seconds.")
-		time.Sleep(15 * time.Second)
-		return connect(username, password,addr)	
-	}
-
-	// Login to server
-	buffer = make([]byte, 3)
-	loginString := "LOGI," + strings.Replace(username,"\n", "", -1) + "," + strings.Replace(password,"\n", "", -1)
-	conn.Write([]byte(loginString))
-
-	// Feedback
-	_,err = conn.Read(buffer)
-	log.Println("Login feedback: " + string(buffer))
-	
-	if(!checkErr(err)){
-		log.Println("Cannot receive login feedback retry in 15 seconds.")
-		time.Sleep(15 * time.Second)
-		return connect(username, password,addr)	
-	}
-
-	if string(buffer) == "NO,"{
-		log.Println("Wrong username or password.")
-		return connect(username, password,addr)	
-	}
-
-	return conn
-}
-
-
-func workers(username string, password string, addr string){
-	conn := connect(username,password,addr)
-	defer conn.Close()
+	checkErr(err)
+	log.Println("Worker created")
 	work(conn)
 }
 
 var username string = ""
-var password string = ""
 var x int = 0
 
 var hashes int = 0
@@ -196,14 +147,12 @@ func calcHash(){
 
 func getBalance()(float64){
 	
-	conn := connect(username, password, getServerInfo())
+	conn, err := net.Dial("tcp", getServerInfo())
+	checkErr(err)
 
-	_,err := conn.Write([]byte("BALA"))
+	_,err = conn.Write([]byte("BALA," + username))
+	checkErr(err)
 	
-	if(!checkErr(err)){
-		return -1
-	}
-
 	buffer := make([]byte, 100)
 	conn.Read(buffer)
 	ball, _ := strconv.ParseFloat( strings.Replace(string(buffer),"\x00", "", -1), 32)
@@ -215,30 +164,26 @@ func main() {
 
 	argsWithoutProg := os.Args[1:]
 	addr := getServerInfo()
-	
 
 	if len(argsWithoutProg) == 0 {
 
 		log.Println("Enter Username:")
 		fmt.Scan(&username)
-		log.Println("Enter password:")
-		fmt.Scan(&password)
 		log.Println("How many goroutine you want?")
 		fmt.Scan(&x)
 
 	}else if len(argsWithoutProg) > 0{
 
 		username = os.Args[1]
-		password = os.Args[2]
-		x,_ = strconv.Atoi(os.Args[3])
+		x,_ = strconv.Atoi(os.Args[2])
 	
 	}
 
 	balance = getBalance()
 
 	for i:=0;i<x;i++{
-		go workers(username, password,addr)
-		time.Sleep(1*time.Second)
+		go workers(username, addr)
+		time.Sleep(2*time.Second)
 	}
 	
 	go func(){
@@ -253,3 +198,4 @@ func main() {
 		calcHash()
 	}
 }
+
