@@ -1,169 +1,100 @@
+
 package main
 
-/*
-.TODO
-
-*- Replace ReadString with ReadUntil
-*- Unite all error reading to one function
-*- Use flag to get arguments from command line
-
-*/
-
 import (
-	"net/http"
 	"log"
-	"io/ioutil"
-	"crypto/sha1"
-	"strings"
-	"strconv"
-	"net"
-	"encoding/hex"
 	"fmt"
 	"os"
+	"crypto/sha1"
+	"encoding/hex"
+	"strconv"
 	"time"
-	"bufio"
+	"strings"
+	"net"
+	"bytes"
 )
 
+var username string = ""
+var x int = 1 // goroutine count
+var addr string = "51.15.127.80:2811"
+var accepted int = 0 // accepted shares
+var rejected int = 0 // decliend shares
 
-func checkErr(x error)(bool){
-	if x == nil{
-		return true
-	}
-	log.Print(x)
-	log.Fatalf("Error quiting.")
-	return false
-}
+func work(){
 
+	conn, _ := net.Dial("tcp", addr)
 
-func getServerInfo()(string){
+	buffer := make([]byte, 3)
+	_,err := conn.Read(buffer)
+	log.Println("Server is on version:" + string(buffer))
 
-	/* Gets the server info in the format of host:port */
-
-	resp, err := http.Get("https://raw.githubusercontent.com/revoxhere/duino-coin/gh-pages/serverip.txt") // gets the response
-	checkErr(err)
-	
-	defer resp.Body.Close() // waits for the functions end to execute
-
-	body, err := ioutil.ReadAll(resp.Body) // reads all data
-	
-	if !checkErr(err){
-		log.Println("Error parsing the get body trying again")
-		return getServerInfo()
+	if(err != nil){
+		log.Fatal("Servers might be down quitting")
 	}
 
-	content := strings.Split(string(body),"\n") // converts string into array
-	host := content[0:2][0] // parses host value
-	port := content[0:2][1]	// parses port value
+	for{
 
-	if len(host)>0 && len(port)>0{
-		return (host + ":" + port) 
-	}
-
-	return getServerInfo()
-}
-
-func work(conn net.Conn){
-	
-	reader := bufio.NewReader(conn) //reads from tcp connection
-
-	for{ //while loop
-		
-		_,err := conn.Write([]byte("JOB,"+username)) // Asking for a job
-		
-		hash, err := reader.ReadString(',')
-		hash = strings.TrimSuffix(hash, ",")
-		
-		if err != nil{
-			log.Println("Error getting the job. Reconnecting to server in 15 seconds")
-			time.Sleep(15 * time.Second)
-			work(conn)
+		// requesting a job
+		_,err := conn.Write([]byte("JOB," + username))
+		if(err != nil){
+			log.Fatal("Error requesting job")
 		}
 
-		job, err := reader.ReadString(',')
-		job = strings.TrimSuffix(job, ",")
-
-		if err != nil{
-			log.Println("Error getting the job. Reconnecting to server in 15 seconds")
-			time.Sleep(15 * time.Second)
-			work(conn)
+		// making a buffer for the job
+		buffer := make([]byte, 1024)
+		_,err = conn.Read(buffer) // Getting the job
+		if(err != nil){
+			log.Fatal("Error getting the job")
 		}
 
-		diff := 3500 // fixed causes unnecesary lag
+		job := strings.Split(string(buffer), ",") // parsing the job
 
+		hash := job[0]
+		goal := job[1]
+		diff, _ := strconv.Atoi( strings.Replace(job[2],"\x00", "", -1) ) //Removes null bytes from job then converts it to an int
 
-		for i := 0; i <= (diff * 100); i++ {
-			hashes++ // add to hash counter
-			h := sha1.New() //hashing object
-			h.Write( []byte(hash + strconv.Itoa(i)) )
-			newhash := hex.EncodeToString(h.Sum(nil))
+		log.Println("Got a job DIF:" + strconv.Itoa(diff) + " HASH:" + hash + " GOAL:" + goal)
+		
+		for i := 0; i <= diff*100; i++{
 
-			if (newhash) == job{ //if the result is the same with the job
+			h := sha1.New()
+			h.Write([]byte( hash + strconv.Itoa(i) )) // hash
+			nh := hex.EncodeToString(h.Sum(nil))
 
+			if nh == goal{
 				_,err = conn.Write( []byte(strconv.Itoa(i)) ) //sends the result of hash algorithm to the pool
 				
-				s, err := reader.ReadString('D')
-				checkErr(err)		
-				
-				if strings.Contains(s, "GOOD"){
-					accepted++
+				if err != nil{
+					log.Println("Error writing hash result")
+					break
 				}
+				
+				feedback_buffer := make([]byte, 6)
+				_,err = conn.Read(feedback_buffer) //reads response
+
+				feedback_buffer = bytes.Trim(feedback_buffer, "\x00")
+				feedback := string(feedback_buffer)
+
+				if feedback == "GOOD" || feedback == "BLOCK"{
+					accepted++
+				}else if feedback == "BAD"{
+					rejected++
+				}else if feedback == "INVU"{
+					log.Fatal("Invalid username received in feedback")
+				}
+
 			}
+
 		}
+
 	}
 }
 
-
-func workers(username string, addr string){
-	conn, err := net.Dial("tcp", addr)
-	buff := make([]byte, 3)
-	_,_ = conn.Read(buff)
-	log.Println("Server is on version:" + string(buff))
-
-	checkErr(err)
-	log.Println("Worker created")
-	work(conn)
-}
-
-var username string = ""
-var x int = 0
-
-var hashes int = 0
-var accepted int = 0
-var balance float64 = 0
-var balanceNew float64 = 0
-
-func profit(){
-	balanceNew := getBalance()
-	log.Print("PROFIT: ",balanceNew-balance)
-	balance = balanceNew
-}
-
-func calcHash(){
-	totalKhashes := hashes / 1000
-	hashes = 0
-	log.Print("TOTAL",totalKhashes,"K/Hs")
-	log.Print("Accepted Shares:",accepted)
-}
-
-func getBalance()(float64){
-	
-	conn, err := net.Dial("tcp", getServerInfo())
-	checkErr(err)
-
-	_,err = conn.Write([]byte("BALA," + username))
-	checkErr(err)
-	
-	buffer := make([]byte, 100)
-	conn.Read(buffer)
-	ball, _ := strconv.ParseFloat( strings.Replace(string(buffer),"\x00", "", -1), 32)
-
-	return ball
-}
-
-func main() {
+func main(){
 
 	argsWithoutProg := os.Args[1:]
-	addr := getServerInfo()
+	
+	log.Println("GO miner started... \n")
 
 	if len(argsWithoutProg) == 0 {
 
@@ -175,27 +106,26 @@ func main() {
 	}else if len(argsWithoutProg) > 0{
 
 		username = os.Args[1]
-		x,_ = strconv.Atoi(os.Args[2])
+		x, _ = strconv.Atoi(os.Args[2])
 	
 	}
 
-	balance = getBalance()
+	string_count := strconv.Itoa(x);
 
-	for i:=0;i<x;i++{
-		go workers(username, addr)
-		time.Sleep(2*time.Second)
+	log.Println("USERNAME:" + username)
+	log.Println("GOROUTINE COUNT:" + string_count)
+
+
+
+	for i:=0; i<x; i++ {
+		go work()
+		time.Sleep(1 * time.Second)
 	}
-	
-	go func(){
-		for{
-			time.Sleep(60 * time.Second)
-			profit()
-		}
-	}()
 
 	for{
-		time.Sleep(1 * time.Second)
-		calcHash()
+
+		log.Printf("Accepted shares :%d Rejected shares:%d\n", accepted, rejected)
+		time.Sleep(10*time.Second)
+
 	}
 }
-
