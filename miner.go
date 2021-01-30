@@ -53,7 +53,7 @@ func work(){
 		goal := job[1]
 		diff, _ := strconv.Atoi( strings.Replace(job[2],"\x00", "", -1) ) //Removes null bytes from job then converts it to an int
 
-		log.Println("Got a job DIF:" + strconv.Itoa(diff) + " HASH:" + hash + " GOAL:" + goal)
+		// log.Println("Got a job DIF:" + strconv.Itoa(diff) + " HASH:" + hash + " GOAL:" + goal)
 		
 		for i := 0; i <= diff*100; i++{
 
