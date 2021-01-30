@@ -29,7 +29,8 @@ func work(){
 	log.Println("Server is on version:" + string(buffer))
 
 	if(err != nil){
-		log.Fatal("Servers might be down quitting")
+		log.Println("Servers might be down or a routine may have restarted quitting routine")
+		return
 	}
 
 	for{
