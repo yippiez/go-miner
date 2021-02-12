@@ -100,7 +100,7 @@ func main() {
 	if len(argsWithoutProg) == 0 {
 		log.Println("Enter your username:")
 		fmt.Scan(&username)
-		log.Println("How many threads do you want to start?")
+		log.Println("How many goroutines do you want to start?")
 		fmt.Scan(&x)
 		log.Println("Select a difficulty, the possible values are NORMAL or MEDIUM:")
 		fmt.Scan(&diff)
