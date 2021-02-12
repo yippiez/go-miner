@@ -7,7 +7,7 @@ A **[duino-coin](https://duinocoin.com/)** miner made in golang.
 ****
 ### Arguments:
 * **Username** -> User to mine for.
-* **Gorutines** -> Amount of goroutines to run in the background (can be thought of as threads).
+* **Goroutines** -> Amount of goroutines to run in the background (can be thought of as threads).
 * **Difficulty** -> NORMAL or MEDIUM mining difficulty.
 
 Learn more about [goroutines (threads)](https://gobyexample.com/goroutines).
