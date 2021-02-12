@@ -1,21 +1,22 @@
 # Go-miner
 
-A **[duino-coin](https://duinocoin.com/)**.miner made in golang.
+A **[duino-coin](https://duinocoin.com/)** miner made in golang.
 
 [![Go](https://img.icons8.com/color/48/000000/golang.png)](https://golang.org/)
 *Check out [Go](https://golang.org/)*.
 ****
 ### Arguments:
-* **Username** -> *Your username*
+* **Username** -> User to mine for.
+* **Gorutines** -> Amount of goroutines to run in the background (can be thought of as threads).
+* **Difficulty** -> NORMAL or MEDIUM mining difficulty.
 
-* **When asked "How many goroutine you want?" answer with a number.**
-*More goroutine will make miner faster but to an extent.*
+Learn more about [goroutines (threads)](https://gobyexample.com/goroutines).
 
-If you want to learn more about goroutines [here](https://gobyexample.com/goroutines).
-
-**You can use miner from the command line like this:**
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; `miner.exe 'username' 'goroutine count'`
+**You can use the miner with a command line interface:**
+```bash
+./main <username (string)> <goroutines (integer)> <difficulty <string>
+```
 
 ****
 ### Todo:
-* Add cache so you don't have to enter your credential every time
+* Add cache for storing user's credentials and execute without asking for them.
