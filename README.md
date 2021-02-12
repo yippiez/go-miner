@@ -14,7 +14,7 @@ Learn more about [goroutines (threads)](https://gobyexample.com/goroutines).
 
 **You can use the miner with a command line interface:**
 ```bash
-./main <username (string)> <goroutines (integer)> <difficulty <string>
+./miner <username (string)> <goroutines (integer)> <difficulty <string>
 ```
 
 ****
