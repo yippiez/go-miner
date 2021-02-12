@@ -10,7 +10,7 @@ A **[duino-coin](https://duinocoin.com/)** miner made in golang.
 * **Gorutines** -> Amount of goroutines to run in the background (can be thought of as threads).
 * **Difficulty** -> NORMAL or MEDIUM mining difficulty.
 
-If you want to learn more about goroutines (threads) [here](https://gobyexample.com/goroutines).
+Learn more about [goroutines (threads)](https://gobyexample.com/goroutines).
 
 **You can use the miner with a command line interface:**
 ```bash
