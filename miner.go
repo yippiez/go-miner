@@ -15,7 +15,7 @@ import (
 )
 
 var username string = " " // User to mine to.
-var diff string = " "     // Possible safe values: MEDIUM, NORMAL.
+var diff string = " "     // Possible safe values: MEDIUM, LOW, NET.
 var x int = 1             // Goroutines count.
 var addr string = "51.15.127.80:2811" // Pool's IP:Pool's port for v2.0 .
 
@@ -36,35 +36,33 @@ func work() {
 
 	for {
 		// Requesting a job.
-		if diff == "NORMAL" {
-			_, err = conn.Write([]byte("JOB," + username))
-		} else if diff == "MEDIUM" {
-			_, err = conn.Write([]byte("JOB," + username + ",MEDIUM"))
-		}
+		_, err = conn.Write([]byte("JOB," + username + "," + diff))
 
 		if err != nil {
 			log.Fatal("Error requesting job.")
 		}
 
 		// Making a buffer for the job.
-		buffer := make([]byte, 1024)
-		_, err = conn.Read(buffer) // Getting the job.
-		if err != nil {
+		buffer := make([]byte, 2048)
+		_, err = conn.Read(buffer) // Getting the jobs.
+
+		if (err != nil) {
+			log.Println(err)
 			log.Fatal("Error getting the job.")
 		}
 
-		job := strings.Split(string(buffer), ",") // Parsing the job.
+		buffer = bytes.Trim(buffer, "\x00")
+		job := strings.Split(strings.TrimSpace(string(buffer)), ",") // Parsing the job.
 		hash := job[0]
 		goal := job[1]
 
 		// Removes null bytes from job then converts it to an int.
-		diff, _ := strconv.Atoi(strings.Replace(job[2], "\x00", "", -1))
+		diff, _ := strconv.Atoi(job[2])
 
 		for i := 0; i <= diff * 100; i++ {
 			h := sha1.New()
 			h.Write([]byte(hash + strconv.Itoa(i))) // Hash
 			nh := hex.EncodeToString(h.Sum(nil))
-
 			if nh == goal {
 				// Sends the result of hash algorithm to the pool.
 				_, err = conn.Write([]byte(strconv.Itoa(i)))
@@ -74,11 +72,17 @@ func work() {
 					break
 				}
 
-				feedback_buffer := make([]byte, 6)
+				feedback_buffer := make([]byte, 20)
 				_, err = conn.Read(feedback_buffer) // Reads response.
+
+				if err != nil{
+					log.Println("Error receiving feedback")
+					log.Fatal(err)
+				}
 
 				feedback_buffer = bytes.Trim(feedback_buffer, "\x00")
 				feedback := string(feedback_buffer)
+				log.Println("FEEDBACK:" + feedback)
 
 				if feedback == "GOOD" || feedback == "BLOCK" {
 					accepted++
@@ -95,14 +99,14 @@ func work() {
 func main() {
 	argsWithoutProg := os.Args[1:]
 
-	log.Println("GO miner started... \n")
+	log.Println("GO miner started... ")
 
 	if len(argsWithoutProg) == 0 {
 		log.Println("Enter your username:")
 		fmt.Scan(&username)
 		log.Println("How many goroutines do you want to start?")
 		fmt.Scan(&x)
-		log.Println("Select a difficulty, the possible values are NORMAL or MEDIUM:")
+		log.Println("Select a difficulty, the possible values are LOW,MEDIUM,NET or EXTREME:")
 		fmt.Scan(&diff)
 	} else if len(argsWithoutProg) > 0 {
 		// Passing command line interface's arguments.
