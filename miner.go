@@ -81,8 +81,7 @@ func work() {
 				}
 
 				feedback_buffer = bytes.Trim(feedback_buffer, "\x00")
-				feedback := string(feedback_buffer)
-				log.Println("FEEDBACK:" + feedback)
+				feedback := (strings.TrimSpace(string(feedback_buffer)))
 
 				if feedback == "GOOD" || feedback == "BLOCK" {
 					accepted++
